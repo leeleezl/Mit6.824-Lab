@@ -101,12 +101,10 @@ func (kv *KVServer) applier() {
 		// 监听 applyCh， raft的Leader节点在得到大部分节点的相应后可以提交操作，并将操作提交到 applyCh 中
 		select {
 		case message := <-kv.applyCh:
-			DPrintf("{Node %v} tries to apply message %v", kv.rf.Me(), message)
 			if message.CommandValid {
 				kv.mu.Lock()
 				// 消息过时了
 				if message.CommandIndex <= kv.lastApplied {
-					DPrintf("{Node %v} discards outdated message %v because a newer snapshot which lastApplied is %v has been restored", kv.rf.Me(), message, kv.lastApplied)
 					kv.mu.Unlock()
 					continue
 				}
@@ -115,7 +113,6 @@ func (kv *KVServer) applier() {
 				var response *CommandResponse
 				command := message.Command.(Command)
 				if command.Op != OpGet && kv.isDuplicateRequest(command.ClientId, command.CommandId) {
-					DPrintf("{Node %v} doesn't apply duplicated message %v to stateMachine because maxAppliedCommandId is %v for client %v", kv.rf.Me(), message, kv.lastOperations[command.ClientId], command.ClientId)
 					response = kv.lastOperations[command.ClientId].LastResponse
 				} else {
 					//应用到状态机上
@@ -125,7 +122,6 @@ func (kv *KVServer) applier() {
 						kv.lastOperations[command.ClientId] = OperationContext{command.CommandId, response}
 					}
 				}
-
 				// 发送到 notifyCh
 				if currentTerm, isLeader := kv.rf.GetState(); isLeader && message.CommandTerm == currentTerm {
 					ch := kv.getNotifyChan(message.CommandIndex)
