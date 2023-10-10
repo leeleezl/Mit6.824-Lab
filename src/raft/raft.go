@@ -641,6 +641,7 @@ func (rf *Raft) applier() {
 		copy(entries, rf.logs[lastApplied+1-firstIndex:commitIndex+1-firstIndex])
 		rf.mu.Unlock()
 		for _, entry := range entries {
+			// 通知上层 KVserver
 			rf.applyCh <- ApplyMsg{
 				CommandValid: true,
 				Command:      entry.Command,
