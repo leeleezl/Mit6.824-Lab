@@ -1,5 +1,7 @@
 package shardctrler
 
+import "time"
+
 //
 // Shard controler: assigns shards to replication groups.
 //
@@ -19,6 +21,7 @@ package shardctrler
 
 // The number of shards.
 const NShards = 10
+const ExecuteTimeout = 500 * time.Millisecond
 
 // A configuration -- an assignment of shards to groups.
 // Please don't change this.
@@ -28,46 +31,48 @@ type Config struct {
 	Groups map[int][]string // gid -> servers[]
 }
 
+func DefaultConfig() Config {
+	return Config{Groups: make(map[int][]string)}
+}
+
+type Command struct {
+	*CommandRequest
+}
+
+type OperationContext struct {
+	MaxAppliedCommandId int64
+	LastResponse        *CommandResponse
+}
+
+type Err uint8
+
 const (
-	OK = "OK"
+	OK Err = iota
+	ErrWrongLeader
+	ErrTimeout
 )
 
-type Err string
+type OperationOp uint8
 
-type JoinArgs struct {
-	Servers map[int][]string // new GID -> servers mappings
+const (
+	OpJoin OperationOp = iota
+	OpLeave
+	OpMove
+	OpQuery
+)
+
+type CommandRequest struct {
+	Servers   map[int][]string
+	GIDs      []int
+	Shard     int
+	GID       int
+	Num       int
+	Op        OperationOp
+	ClientId  int64
+	CommandId int64
 }
 
-type JoinReply struct {
-	WrongLeader bool
-	Err         Err
-}
-
-type LeaveArgs struct {
-	GIDs []int
-}
-
-type LeaveReply struct {
-	WrongLeader bool
-	Err         Err
-}
-
-type MoveArgs struct {
-	Shard int
-	GID   int
-}
-
-type MoveReply struct {
-	WrongLeader bool
-	Err         Err
-}
-
-type QueryArgs struct {
-	Num int // desired config number
-}
-
-type QueryReply struct {
-	WrongLeader bool
-	Err         Err
-	Config      Config
+type CommandResponse struct {
+	Err    Err
+	Config Config
 }
