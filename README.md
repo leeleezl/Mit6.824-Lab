@@ -16,4 +16,7 @@
 
 ### Lab3 KV Service
 
-[Note1 KV Service 3A 无快照](https://github.com/leeleezl/Mit6.824-Lab/blob/master/Notes/%E5%AE%9E%E9%AA%8C-Lab3A-%E6%97%A0%E5%BF%AB%E7%85%A7%E7%9A%84%20KV%20Service.md)
+[Note1 KV Service 3](https://github.com/leeleezl/Mit6.824-Lab/blob/master/Notes/%E5%AE%9E%E9%AA%8C-Lab3A-%E6%97%A0%E5%BF%AB%E7%85%A7%E7%9A%84%20KV%20Service.md)
+
+### Lab4 Shard KV Service
+[Note1 Shard KV Service](https://github.com/leeleezl/Mit6.824-Lab/blob/master/Notes/%E5%AE%9E%E9%AA%8C-Lab4-Shard%20KV%20Service.md)
