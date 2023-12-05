@@ -1,6 +1,8 @@
 package kvraft
 
 import (
+	"bytes"
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -127,7 +129,23 @@ func (kv *KVServer) applier() {
 					ch := kv.getNotifyChan(message.CommandIndex)
 					ch <- response
 				}
+
+				//判断是否需要快照
+				needSnapshot := kv.needSnapshot()
+				if needSnapshot {
+					kv.takeSnapshot(message.CommandIndex)
+				}
 				kv.mu.Unlock()
+				//需要装载快照
+			} else if message.SnapshotValid {
+				kv.mu.Lock()
+				if kv.rf.CondInstallSnapshot(message.SnapshotTerm, message.SnapshotIndex, message.Snapshot) {
+					kv.restoreSnapshot(message.Snapshot)
+					kv.lastApplied = message.SnapshotIndex
+				}
+				kv.mu.Unlock()
+			} else {
+				panic(fmt.Sprintf("unexpected Message %v", message))
 			}
 		}
 	}
@@ -145,6 +163,34 @@ func (kv *KVServer) applyLogToStateMachine(command Command) *CommandResponse {
 		value, err = kv.stateMachine.Get(command.Key)
 	}
 	return &CommandResponse{err, value}
+}
+
+func (kv *KVServer) needSnapshot() bool {
+	return kv.maxraftstate != -1 && kv.maxraftstate <= kv.rf.GetRaftStateSize()
+}
+
+func (kv *KVServer) takeSnapshot(index int) {
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e.Encode(kv.stateMachine)
+	e.Encode(kv.lastOperations)
+	kv.rf.Snapshot(index, w.Bytes())
+}
+
+func (kv *KVServer) restoreSnapshot(snapshot []byte) {
+	if snapshot == nil || len(snapshot) == 0 {
+		return
+	}
+	r := bytes.NewBuffer(snapshot)
+	d := labgob.NewDecoder(r)
+	var stateMachine MemoryKV
+	var lastOperations map[int64]OperationContext
+
+	if d.Decode(&stateMachine) != nil ||
+		d.Decode(&lastOperations) != nil {
+		DPrintf("{Node %v} restores snapshot failed", kv.rf.Me())
+	}
+	kv.stateMachine, kv.lastOperations = &stateMachine, lastOperations
 }
 
 //
@@ -198,7 +244,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 		lastOperations: make(map[int64]OperationContext),
 		notifyChans:    make(map[int]chan *CommandResponse),
 	}
-
+	kv.restoreSnapshot(persister.ReadSnapshot())
 	go kv.applier()
 
 	DPrintf("{Node %v} has started", kv.rf.Me())
